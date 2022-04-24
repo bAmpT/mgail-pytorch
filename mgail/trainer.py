@@ -142,7 +142,12 @@ class Trainer(object):
 
         # environment initialization point (random or from start)
         # TODO: option to start at zero 
-        observation = self.env.reset()
+        if start_at_zero:
+            observation = self.env.reset()
+        else:
+            #qposs, qvels = alg.er_expert.sample()[5:]
+            #observation = self.env.reset(qpos=qposs[0], qvel=qvels[0])
+            observation = self.env.reset()
 
         do_keep_prob = self.env.do_keep_prob
         t = 0

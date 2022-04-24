@@ -46,7 +46,7 @@ def dispatcher(env):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--env_name', type=str, default='InvertedPendulum-v2')
+    p.add_argument('--env_name', type=str, default='Hopper-v2')
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--seed', type=int, default=0)
     args = p.parse_args()

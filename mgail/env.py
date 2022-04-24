@@ -23,7 +23,6 @@ class Environment(object):
         if mode == 'tensorflow':
             state, reward, done = self._step(action)
             state = torch.as_tensor(state).view(1, self.state_size)
-            #done.set_shape(())
         else:
             state, reward, done = self._step(action)
 
@@ -53,8 +52,8 @@ class Environment(object):
     def _train_params(self):
         self.trained_model = None
         self.train_mode = True
-        self.agent_data = 'agent_trajectories/inverted_pendulum_er_agent.bin'
-        self.expert_data = 'expert_trajectories/inverted_pendulum_er.bin'
+        self.agent_data = 'agent_trajectories/hopper_er_agent.bin'
+        self.expert_data = 'expert_trajectories/hopper_er.bin'
         self.n_train_iters = 1000000
         self.n_episodes_test = 1
         self.test_interval = 1000

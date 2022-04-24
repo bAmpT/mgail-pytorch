@@ -18,6 +18,7 @@ def load_er(fname: str, batch_size: int, history_length: int, traj_length: int) 
     try: 
         er = pickle.load(f)
     except: 
+        f.seek(0)
         er = pickle.load(f, encoding="latin1")
     er.batch_size = batch_size
     er = set_er_stats(er, history_length, traj_length)
