@@ -1,19 +1,21 @@
 import torch
 import numpy as np
 import gym
+from mgail.common import FrameStack
 
 
 class Environment(object):
     def __init__(self, run_dir: str, env_name: str):
         self.name = env_name
+        self._train_params()
         self.gym = gym.make(self.name)
+        self.gym = FrameStack(self.gym, self.history_length)
         self.random_initialization = True
         self._connect()
-        self._train_params()
         self.run_dir = run_dir
 
     def _step(self, action: np.ndarray):
-        action = [np.squeeze(action)]
+        #action = [np.squeeze(action)]
         self.t += 1
         result = self.gym.step(action)
         self.state, self.reward, self.done, self.info = result[:4]
@@ -22,7 +24,7 @@ class Environment(object):
     def step(self, action: np.ndarray, mode: str):
         if mode == 'tensorflow':
             state, reward, done = self._step(action)
-            state = torch.as_tensor(state).view(1, self.state_size)
+            state = torch.as_tensor(state).view(1, self.history_length, self.state_size).squeeze()
         else:
             state, reward, done = self._step(action)
 
@@ -46,6 +48,8 @@ class Environment(object):
 
     def _connect(self):
         self.state_size = self.gym.observation_space.shape[0]
+        if self.history_length > 1:
+            self.state_size = self.gym.observation_space.shape[-1]    
         self.action_size = self.gym.action_space.shape[0]
         self.action_space = np.asarray([None]*self.action_size)
 
@@ -71,6 +75,8 @@ class Environment(object):
         self.discr_policy_itrvl = 100
         self.gamma = 0.99
         self.batch_size = 70
+        self.history_length = 10 # past trajectory states
+        self.traj_length = 10 # prediction horizon
         self.weight_decay = 1e-7
         self.policy_al_w = 1e-2
         self.policy_tr_w = 1e-4

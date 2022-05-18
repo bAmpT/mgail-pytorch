@@ -25,11 +25,13 @@ class Policy(nn.Module):
         )
         self.fc_out = nn.Linear(self.arch_params['n_hidden_1'], out_dim)
         
-        self.model.apply(common.init_weights)
-        self.fc_out.apply(common.init_weights)
+        #self.model.apply(common.init_weights)
+        #self.fc_out.apply(common.init_weights)
        
     def forward(self, state: torch.Tensor, do_keep_prob: float = None) -> torch.Tensor:
-        x = self.model(state)
+        bs = state.size(0)
+
+        x = self.model(state[:,-1].view(bs, -1))
         
         do_keep_prob = self.arch_params['do_keep_prob'] if do_keep_prob == None else do_keep_prob
         x = F.dropout(x, p=1.0-do_keep_prob, training=self.training)

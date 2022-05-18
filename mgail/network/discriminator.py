@@ -19,9 +19,9 @@ class Discriminator(nn.Module):
 
         self.model = nn.Sequential(
             nn.Linear(self.arch_params['in_dim'], self.arch_params['n_hidden_0']),
-            nn.ReLU(),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(self.arch_params['n_hidden_0'], self.arch_params['n_hidden_1']),
-            nn.ReLU()
+            nn.LeakyReLU(0.2, inplace=True)
         )
         self.fc_out = nn.Linear(self.arch_params['n_hidden_1'], out_dim)
 
@@ -30,7 +30,9 @@ class Discriminator(nn.Module):
         self.fc_out.apply(common.init_weights)
 
     def forward(self, state: torch.Tensor, action: torch.Tensor, do_keep_prob: float = None) -> torch.Tensor:
-        concat = torch.cat([state, action], axis=1)
+        bs = state.size(0)
+
+        concat = torch.cat([state[:,-1].view(bs, -1), action.view(bs, -1)], axis=1)
         x = self.model(concat)
         
         do_keep_prob = self.arch_params['do_keep_prob'] if do_keep_prob == None else do_keep_prob

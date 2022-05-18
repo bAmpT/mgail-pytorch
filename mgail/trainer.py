@@ -1,3 +1,4 @@
+import os
 import pickle
 import sys
 import time
@@ -54,17 +55,15 @@ class Trainer(object):
 
     def train_forward_model(self) -> None:
         alg = self.algorithm
-        states_, actions, _, states = alg.er_agent.sample()[:4]
-        states_, actions, states = torch.as_tensor(states_), torch.as_tensor(actions), torch.as_tensor(states)
+        input_states, actions, _, target_states = alg.er_agent.sample()[:4]
+        input_states, actions, target_states = torch.as_tensor(input_states), torch.as_tensor(actions), torch.as_tensor(target_states)
         
-        states_ = common.normalize(states_, alg.er_expert.states_mean, alg.er_expert.states_std).float()
+        input_states = common.normalize(input_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
         actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
-        states = common.normalize(states, alg.er_expert.states_mean, alg.er_expert.states_std)
+        target_states = common.normalize(target_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
         
-        initial_gru_state = torch.ones((states.shape[0], alg.forward_model.encoding_size))
-        forward_model_prediction, _ = alg.forward_model(states_, actions, initial_gru_state)
-        
-        forward_model_loss = torch.mean(torch.square(states-forward_model_prediction)) #F.mse_loss(forward_model_prediction, states) 
+        [forward_model_predictions, z_list], forward_model_loss = alg.forward_model(input_states, actions, target_states)
+        #forward_model_loss = torch.mean(torch.square(states-forward_model_prediction)) #F.mse_loss(forward_model_prediction, states) 
         
         self.forward_opt.zero_grad()
         forward_model_loss.backward()
@@ -88,7 +87,7 @@ class Trainer(object):
 
         states = common.normalize(states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
         actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
-        d = alg.discriminator(states, actions)
+        d = alg.discriminator(states, actions[:,0])
 
         # 2.1 0-1 accuracy
         correct_predictions = torch.argmax(d, axis=1) == torch.argmax(labels, axis=1)
@@ -124,7 +123,7 @@ class Trainer(object):
         policy_loss = torch.zeros((1))
         for i in range(self.env.policy_accum_steps):
             # accumulate AL gradient
-            states = torch.as_tensor(state).unsqueeze(0).float()
+            states = torch.as_tensor(np.array(state)).unsqueeze(0).float()
             policy_loss += alg.train(states) / self.env.policy_accum_steps
             # clip gradients
             policy_loss.register_hook(lambda grad: torch.clamp(grad, -2, 2))
@@ -163,7 +162,8 @@ class Trainer(object):
             if not noise_flag:
                 do_keep_prob = 1.
 
-            states = torch.as_tensor(np.reshape(observation, [1, -1])).float()
+            # use frame stacked observations
+            states = torch.as_tensor(np.reshape(observation, [1, self.env.history_length, -1])).float()
             a = alg.action_test(states, noise=float(noise_flag), do_keep_prob=do_keep_prob).detach().cpu().numpy().astype(np.float32)
             
             observation, reward, done, info = self.env.step(a, mode='python')
@@ -181,7 +181,7 @@ class Trainer(object):
                 alg.er_agent.add(
                     actions=action, 
                     rewards=[reward], 
-                    next_states=[observation], 
+                    next_states=[observation[-1]], # add latest observed state to buffer
                     terminals=[done], 
                 )
 
@@ -196,8 +196,10 @@ class Trainer(object):
         # Fill Experience Buffer
         if self.itr == 0:
             if self.env.agent_data != None:
-                with open(self.env.agent_data, 'rb') as f:
-                    self.algorithm.er_agent = pickle.load(f)
+                self.algorithm.er_agent = common.load_er(fname=os.path.join(self.env.run_dir, self.env.agent_data),
+                                                         batch_size=self.env.batch_size,
+                                                         history_length=self.env.history_length,
+                                                         traj_length=self.env.traj_length)
             else:
                 while self.algorithm.er_agent.current == self.algorithm.er_agent.count:
                     self.collect_experience()

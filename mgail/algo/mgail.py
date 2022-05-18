@@ -5,7 +5,7 @@ import os
 import mgail.common as common
 from mgail.buffer import ER
 from mgail.env import Environment
-from mgail.network.forward_model import ForwardModel
+from mgail.network.forward_model import ForwardModel, ForwardModelVAE
 from mgail.network.discriminator import Discriminator
 from mgail.network.policy import Policy
 
@@ -21,10 +21,10 @@ class MGAIL(object):
         self.do_keep_prob = do_keep_prob 
 
         # Create MGAIL modules
-        self.forward_model = ForwardModel(
+        self.forward_model = ForwardModelVAE(
             state_size=self.env.state_size,
             action_size=self.env.action_size,
-            encoding_size=self.env.fm_size
+            hidden_size=self.env.fm_size
         )
 
         self.discriminator = Discriminator(
@@ -48,14 +48,15 @@ class MGAIL(object):
             action_dim=self.env.action_size,
             reward_dim=1,  # stub connection
             batch_size=self.env.batch_size,
-            history_length=1
+            history_length=self.env.history_length,
+            traj_length=self.env.traj_length
         )
 
         # Load the experts experience buffer
         self.er_expert = common.load_er(fname=os.path.join(self.env.run_dir, self.env.expert_data),
                                         batch_size=self.env.batch_size,
-                                        history_length=1,
-                                        traj_length=2)
+                                        history_length=self.env.history_length,
+                                        traj_length=self.env.traj_length)
 
         self.env.sigma = self.er_expert.actions_std / self.env.noise_intensity
 
@@ -113,8 +114,8 @@ class MGAIL(object):
             state_e = common.normalize(state_env, self.er_expert.states_mean, self.er_expert.states_std).float()
             state_e = state_e.detach() # stop gradient
             
-            initial_gru_state = torch.ones((1, self.forward_model.encoding_size))
-            state_a, _ = self.forward_model(state, action, initial_gru_state)
+            z_t = self.forward_model.sample_z(state.size(0))
+            state_a = self.forward_model.forward_single_step(state, action, z_t).unsqueeze(0)
 
             state, nu = common.re_parametrization(state_e=state_e, state_a=state_a)
             total_trans_err += torch.mean(abs(nu))

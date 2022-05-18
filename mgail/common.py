@@ -1,7 +1,13 @@
+from collections import deque
+from ctypes import Union
+import math
 import pickle
 import torch
 import torch.nn as nn
 import numpy as np
+import gym
+from gym.error import DependencyNotInstalled
+from gym.spaces import Box
 
 import mgail.buffer as buffer
 from mgail.buffer import ER
@@ -27,8 +33,11 @@ def load_er(fname: str, batch_size: int, history_length: int, traj_length: int) 
 def set_er_stats(er: ER, history_length: int, traj_length: int) -> ER:
     state_dim = er.states.shape[-1]
     action_dim = er.actions.shape[-1]
+    er.history_length = history_length
+    er.traj_length = traj_length
     er.prestates = np.empty((er.batch_size, history_length, state_dim), dtype=np.float32)
     er.poststates = np.empty((er.batch_size, history_length, state_dim), dtype=np.float32)
+    er.state_actions = np.empty((er.batch_size, history_length, action_dim), dtype=np.float32)
     er.traj_states = np.empty((er.batch_size, traj_length, state_dim), dtype=np.float32)
     er.traj_actions = np.empty((er.batch_size, traj_length-1, action_dim), dtype=np.float32)
     er.states_min = np.min(er.states[:er.count], axis=0)
@@ -140,3 +149,88 @@ def atanh(x):
 def evaluate_lop_pi(means, log_stds, actions):
     noises = (atanh(actions) - means) / (log_stds.exp() + 1e-8)
     return calculate_log_pi(log_stds, noises, actions)
+
+###########################################################################################################################
+
+class FrameStack(gym.ObservationWrapper):
+    """Observation wrapper that stacks the observations in a rolling manner.
+    For example, if the number of stacks is 4, then the returned observation contains
+    the most recent 4 observations. For environment 'Pendulum-v1', the original observation
+    is an array with shape [3], so if we stack 4 observations, the processed observation
+    has shape [4, 3].
+    Note:
+        - To be memory efficient, the stacked observations are wrapped by :class:`LazyFrame`.
+        - The observation space must be :class:`Box` type. If one uses :class:`Dict`
+          as observation space, it should apply :class:`FlattenObservation` wrapper first.
+          - After :meth:`reset` is called, the frame buffer will be filled with the initial observation. I.e. the observation returned by :meth:`reset` will consist of ``num_stack`-many identical frames,
+    Example:
+        >>> import gym
+        >>> env = gym.make('CarRacing-v1')
+        >>> env = FrameStack(env, 4)
+        >>> env.observation_space
+        Box(4, 96, 96, 3)
+        >>> obs = env.reset()
+        >>> obs.shape
+        (4, 96, 96, 3)
+    """
+
+    def __init__(self, env: gym.Env, num_stack: int, lz4_compress: bool = False):
+        """Observation wrapper that stacks the observations in a rolling manner.
+        Args:
+            env (Env): The environment to apply the wrapper
+            num_stack (int): The number of frames to stack
+            lz4_compress (bool): Use lz4 to compress the frames internally
+        """
+        super().__init__(env)
+        self.num_stack = num_stack
+        self.lz4_compress = lz4_compress
+
+        self.frames = deque(maxlen=num_stack)
+
+        low = np.repeat(self.observation_space.low[np.newaxis, ...], num_stack, axis=0)
+        high = np.repeat(
+            self.observation_space.high[np.newaxis, ...], num_stack, axis=0
+        )
+        self.observation_space = Box(
+            low=low, high=high, dtype=self.observation_space.dtype
+        )
+
+    def observation(self, observation):
+        """Converts the wrappers current frames to lazy frames.
+        Args:
+            observation: Ignored
+        Returns:
+            :class:`LazyFrames` object for the wrapper's frame buffer,  :attr:`self.frames`
+        """
+        assert len(self.frames) == self.num_stack, (len(self.frames), self.num_stack)
+        return self.frames
+
+    def step(self, action):
+        """Steps through the environment, appending the observation to the frame buffer.
+        Args:
+            action: The action to step through the environment with
+        Returns:
+            Stacked observations, reward, done and information from the environment
+        """
+        observation, reward, done, info = self.env.step(action)
+        self.frames.append(observation)
+        return self.observation(None), reward, done, info
+
+    def reset(self, **kwargs):
+        """Reset the environment with kwargs.
+        Args:
+            **kwargs: The kwargs for the environment reset
+        Returns:
+            The stacked observations
+        """
+        if kwargs.get("return_info", False):
+            obs, info = self.env.reset(**kwargs)
+        else:
+            obs = self.env.reset(**kwargs)
+            info = None  # Unused
+        [self.frames.append(obs) for _ in range(self.num_stack)]
+
+        if kwargs.get("return_info", False):
+            return self.observation(None), info
+        else:
+            return self.observation(None)
