@@ -55,7 +55,7 @@ class Trainer(object):
 
     def train_forward_model(self) -> None:
         alg = self.algorithm
-        input_states, actions, _, target_states = alg.er_agent.sample()[:4]
+        input_states, _, _, target_states, actions = alg.er_agent.sample()[:5]
         input_states, actions, target_states = torch.as_tensor(input_states), torch.as_tensor(actions), torch.as_tensor(target_states)
         
         input_states = common.normalize(input_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
@@ -87,7 +87,7 @@ class Trainer(object):
 
         states = common.normalize(states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
         actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
-        d = alg.discriminator(states, actions[:,0])
+        d = alg.discriminator(states, actions)
 
         # 2.1 0-1 accuracy
         correct_predictions = torch.argmax(d, axis=1) == torch.argmax(labels, axis=1)

@@ -84,16 +84,17 @@ class ER(object):
             # having index first is fastest in C-order matrices
             self.prestates[len(indexes), ...] = self.get_elements_history(self.states, index-1, self.history_length)
             self.traj_states[len(indexes), ...] = self.get_elements_future(self.states, index, self.traj_length)
-            self.state_actions[len(indexes), ...] = self.get_elements_future(self.actions, index, self.traj_length)
+            self.traj_actions[len(indexes), ...] = self.get_elements_future(self.actions, index, self.traj_length-1) # TODO: Check if the right actions are associated to states (the actions are selected -> to get to state)
             
             indexes.append(index)
 
-        actions = self.state_actions.astype(np.float32)
+        actions = self.actions[indexes, ...].astype(np.float32)
         rewards = self.rewards[indexes, ...]
         
         terminals = self.terminals[indexes]
 
         prestates = np.squeeze(self.prestates).astype(np.float32)
         traj_states = np.squeeze(self.traj_states).astype(np.float32)
+        traj_actions = np.squeeze(self.traj_actions).astype(np.float32)
 
-        return prestates, actions, rewards, traj_states, terminals
+        return prestates, actions, rewards, traj_states, traj_actions, terminals

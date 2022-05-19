@@ -19,14 +19,14 @@ class Policy(nn.Module):
 
         self.model = nn.Sequential(
             nn.Linear(self.arch_params['in_dim'], self.arch_params['n_hidden_0']),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(self.arch_params['n_hidden_0'], self.arch_params['n_hidden_1']),
-            nn.ReLU()
+            nn.ReLU(inplace=True)
         )
         self.fc_out = nn.Linear(self.arch_params['n_hidden_1'], out_dim)
         
-        #self.model.apply(common.init_weights)
-        #self.fc_out.apply(common.init_weights)
+        self.model.apply(common.init_weights)
+        self.fc_out.apply(common.init_weights)
        
     def forward(self, state: torch.Tensor, do_keep_prob: float = None) -> torch.Tensor:
         bs = state.size(0)

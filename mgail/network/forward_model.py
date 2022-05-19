@@ -129,7 +129,7 @@ class ForwardModelVAE(nn.Module):
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(n_hidden, self.hidden_size)
+            nn.Linear(n_hidden, self.hidden_size),
         )
         self.decoder = nn.Sequential(
             nn.Linear(self.hidden_size, n_hidden), # => [state + prev_state]
@@ -192,6 +192,12 @@ class ForwardModelVAE(nn.Module):
 
         # Initialize weights
         #self.apply(common.init_weights)
+        # self.encoder.apply(common.init_weights)
+        # self.decoder.apply(common.init_weights)
+        # self.y_encoder.apply(common.init_weights)
+        # self.a_encoder.apply(common.init_weights)
+        # self.z_network.apply(common.init_weights)
+        # self.z_expander.apply(common.init_weights)
     
     def reparameterize(self, mu, logvar, sample):
         if self.training or sample:
@@ -220,8 +226,9 @@ class ForwardModelVAE(nn.Module):
         #h_joint = h_joint + self.u_network(h_joint)
 
         pred_state = self.decoder(h_joint)
-        pred_state = torch.clamp(pred_state + input_states[:, -1], min=-6, max=6)
+        #pred_state = torch.clamp(pred_state + input_states[:, -1], min=-6, max=6)
         pred_state = pred_state + input_states[:, -1]
+        #pred_state = torch.sigmoid(pred_state + input_states[:, -1])
 
         return pred_state
 
@@ -290,6 +297,7 @@ class ForwardModelVAE(nn.Module):
                 pred_state.detach()
             # Next state is relative to previous state
             pred_state = pred_state + input_states[:, -1]
+            #pred_state = torch.sigmoid(pred_state + input_states[:, -1])
             pred_states.append(pred_state)
             
             # Append predicted states to input for next prediction step

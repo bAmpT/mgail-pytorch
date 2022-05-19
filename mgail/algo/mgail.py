@@ -28,14 +28,14 @@ class MGAIL(object):
         )
 
         self.discriminator = Discriminator(
-            in_dim=self.env.state_size + self.env.action_size,
+            in_dim=self.env.state_size + self.env.action_size, # add whole trajectory for state:  self.env.history_length*self.env.state_size
             out_dim=2,
             size=self.env.d_size,
             do_keep_prob=self.do_keep_prob
         )
 
         self.policy = Policy(
-            in_dim=self.env.state_size,
+            in_dim=self.env.state_size, # add whole trajectory for state:  self.env.history_length*self.env.state_size
             out_dim=self.env.action_size,
             size=self.env.p_size,
             do_keep_prob=self.do_keep_prob

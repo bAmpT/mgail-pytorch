@@ -19,9 +19,9 @@ class Discriminator(nn.Module):
 
         self.model = nn.Sequential(
             nn.Linear(self.arch_params['in_dim'], self.arch_params['n_hidden_0']),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
             nn.Linear(self.arch_params['n_hidden_0'], self.arch_params['n_hidden_1']),
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.ReLU(inplace=True)
         )
         self.fc_out = nn.Linear(self.arch_params['n_hidden_1'], out_dim)
 
