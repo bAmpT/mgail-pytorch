@@ -1,6 +1,7 @@
 from collections import deque
 from ctypes import Union
 import math
+import pdb
 import pickle
 import torch
 import torch.nn as nn
@@ -39,7 +40,7 @@ def set_er_stats(er: ER, history_length: int, traj_length: int) -> ER:
     er.poststates = np.empty((er.batch_size, history_length, state_dim), dtype=np.float32)
     er.state_actions = np.empty((er.batch_size, history_length, action_dim), dtype=np.float32)
     er.traj_states = np.empty((er.batch_size, traj_length, state_dim), dtype=np.float32)
-    er.traj_actions = np.empty((er.batch_size, traj_length-1, action_dim), dtype=np.float32)
+    er.traj_actions = np.empty((er.batch_size, traj_length, action_dim), dtype=np.float32)
     er.states_min = np.min(er.states[:er.count], axis=0)
     er.states_max = np.max(er.states[:er.count], axis=0)
     er.actions_min = np.min(er.actions[:er.count], axis=0)
@@ -114,6 +115,16 @@ def disable_gradient(network):
 def add_random_noise(action, std):
     action += np.random.randn(*action.shape) * std
     return action.clip(-1.0, 1.0)
+
+def grad_norm(net):
+    total_norm = 0
+    for p in net.parameters():
+        if p.grad is None:
+            pdb.set_trace()
+        param_norm = p.grad.data.norm(2)
+        total_norm += param_norm ** 2
+    total_norm = total_norm ** (1. / 2)
+    return total_norm
 
 #----
 

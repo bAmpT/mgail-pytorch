@@ -1,3 +1,4 @@
+import math
 import os
 import pickle
 import sys
@@ -62,12 +63,18 @@ class Trainer(object):
         actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
         target_states = common.normalize(target_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
         
-        [forward_model_predictions, z_list], forward_model_loss = alg.forward_model(input_states, actions, target_states)
-        #forward_model_loss = torch.mean(torch.square(states-forward_model_prediction)) #F.mse_loss(forward_model_prediction, states) 
-        
+        [pred_states, z_list], loss_pred = alg.forward_model(input_states, actions, target_states)
+
+        loss_state = F.mse_loss(pred_states, target_states, reduction='mean')
+        forward_model_loss = loss_state + self.env.fm_beta*loss_pred
+
         self.forward_opt.zero_grad()
-        forward_model_loss.backward()
-        self.forward_opt.step()
+        # VAEs get NaN loss sometimes, so check for it
+        if not math.isnan(forward_model_loss.item()):
+            forward_model_loss.backward(retain_graph=False)
+            if not math.isnan(common.grad_norm(alg.forward_model).item()):
+                torch.nn.utils.clip_grad_norm_(alg.forward_model.parameters(), self.env.fm_grad_clip)
+                self.forward_opt.step()
 
         self.update_stats('forward_model', 'loss', forward_model_loss.item())
 

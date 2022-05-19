@@ -23,7 +23,7 @@ class ER(object):
         self.state_actions = np.empty((self.batch_size, self.history_length, action_dim), dtype=np.float32)
         self.traj_length = traj_length
         self.traj_states = np.empty((self.batch_size, self.traj_length, state_dim), dtype=np.float32)
-        self.traj_actions = np.empty((self.batch_size, self.traj_length-1, action_dim), dtype=np.float32)
+        self.traj_actions = np.empty((self.batch_size, self.traj_length, action_dim), dtype=np.float32)
 
     def add(self, actions, rewards, next_states, terminals):
         # state is post-state, after action and reward
@@ -84,7 +84,7 @@ class ER(object):
             # having index first is fastest in C-order matrices
             self.prestates[len(indexes), ...] = self.get_elements_history(self.states, index-1, self.history_length)
             self.traj_states[len(indexes), ...] = self.get_elements_future(self.states, index, self.traj_length)
-            self.traj_actions[len(indexes), ...] = self.get_elements_future(self.actions, index, self.traj_length-1) # TODO: Check if the right actions are associated to states (the actions are selected -> to get to state)
+            self.traj_actions[len(indexes), ...] = self.get_elements_future(self.actions, index, self.traj_length) # TODO: Check if the right actions are associated to states (the actions are selected -> to get to state)
             
             indexes.append(index)
 

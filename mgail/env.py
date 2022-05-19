@@ -75,7 +75,7 @@ class Environment(object):
         self.discr_policy_itrvl = 100
         self.gamma = 0.99
         self.batch_size = 70
-        self.history_length = 10 # past trajectory states
+        self.history_length = 5 # past trajectory states
         self.traj_length = 10 # prediction horizon
         self.weight_decay = 1e-7
         self.policy_al_w = 1e-2
@@ -96,6 +96,10 @@ class Environment(object):
         self.fm_lr = 1e-4
         self.d_lr = 1e-3
         self.p_lr = 1e-4
+
+        # Hyperparameters
+        self.fm_beta = 1e-6
+        self.fm_grad_clip = 5.0
 
 
 

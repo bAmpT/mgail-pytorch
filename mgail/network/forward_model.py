@@ -64,7 +64,6 @@ class ForwardModel(nn.Module):
 
         return next_state, gru_state
 
-
 class StateEncoder(nn.Module):
     def __init__(self, input_size: int, output_size: int, encoding_size: int, dropout: float = 0.0) -> None:
         super().__init__()
@@ -104,18 +103,18 @@ class StateDecoder(nn.Module):
         return self.decoder(x)
 
 class ForwardModelVAE(nn.Module): 
-    def __init__(self, state_size: int, action_size: int, hidden_size: int) -> None:
+    def __init__(self, state_size: int, action_size: int, encoding_size: int) -> None:
         super().__init__()
 
         self.state_size = state_size
         self.action_size = action_size
-        self.hidden_size = hidden_size
+        self.hidden_size = encoding_size
 
-        self.dropout = 0
+        self.dropout = 0.1
         self.nfeature = 128
         self.nz = 32 # num of hidden variables
         self.n_steps = 10 # num of predicted steps
-        self.n_inputs = 10 # num of history of states
+        self.n_inputs = 5 # num of history of states
         self.n_out = state_size
 
         n_hidden = 128
@@ -125,18 +124,10 @@ class ForwardModelVAE(nn.Module):
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(n_hidden, n_hidden),
-            nn.Dropout(p=self.dropout, inplace=True),
-            nn.LeakyReLU(0.2, inplace=True),
-
             nn.Linear(n_hidden, self.hidden_size),
         )
         self.decoder = nn.Sequential(
-            nn.Linear(self.hidden_size, n_hidden), # => [state + prev_state]
-            nn.Dropout(p=self.dropout, inplace=True),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            nn.Linear(n_hidden, n_hidden),
+            nn.Linear(self.hidden_size, n_hidden), 
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
 
@@ -145,10 +136,6 @@ class ForwardModelVAE(nn.Module):
         
         self.a_encoder = nn.Sequential(
             nn.Linear(action_size, self.nfeature),
-            nn.Dropout(p=self.dropout, inplace=True),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            nn.Linear(self.nfeature, self.nfeature),
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
             
@@ -160,17 +147,10 @@ class ForwardModelVAE(nn.Module):
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(self.nfeature, self.nfeature),
-            nn.Dropout(p=self.dropout, inplace=True),
-            nn.LeakyReLU(0.2, inplace=True),
-
             nn.Linear(self.nfeature, 2*self.nz)
         )
         self.z_expander = nn.Sequential(
             nn.Linear(self.nz, self.nfeature),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            nn.Linear(self.nfeature, self.nfeature),
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Linear(self.nfeature, self.hidden_size)
@@ -183,15 +163,11 @@ class ForwardModelVAE(nn.Module):
             nn.Dropout(p=self.dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(n_hidden, n_hidden),
-            nn.Dropout(p=self.dropout, inplace=True),
-            nn.LeakyReLU(0.2, inplace=True),
-
             nn.Linear(n_hidden, self.hidden_size)
         )
 
         # Initialize weights
-        #self.apply(common.init_weights)
+        # self.apply(common.init_weights)
         # self.encoder.apply(common.init_weights)
         # self.decoder.apply(common.init_weights)
         # self.y_encoder.apply(common.init_weights)
@@ -227,8 +203,8 @@ class ForwardModelVAE(nn.Module):
 
         pred_state = self.decoder(h_joint)
         #pred_state = torch.clamp(pred_state + input_states[:, -1], min=-6, max=6)
-        pred_state = pred_state + input_states[:, -1]
         #pred_state = torch.sigmoid(pred_state + input_states[:, -1])
+        pred_state = pred_state + input_states[:, -1]
 
         return pred_state
 
@@ -237,7 +213,7 @@ class ForwardModelVAE(nn.Module):
         inputs: [bs, n_inputs, state_size]
         targets: [bs, n_steps, state_size]
         :returns
-        
+        predictions, kdl_loss
         """
         bs = inputs.size(0)
         
