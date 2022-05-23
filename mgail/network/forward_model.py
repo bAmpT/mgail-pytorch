@@ -64,11 +64,11 @@ class ForwardModel(nn.Module):
 
         return next_state, gru_state
 
-class StateEncoder(nn.Module):
+class Encoder(nn.Module):
     def __init__(self, input_size: int, output_size: int, encoding_size: int, dropout: float = 0.0) -> None:
         super().__init__()
 
-        self.encoder = nn.Sequential(
+        self.state_encoder = nn.Sequential(
             nn.Linear(input_size, encoding_size),
             nn.Dropout(p=dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
@@ -81,13 +81,13 @@ class StateEncoder(nn.Module):
         )
         
     def forward(self, x):
-        return self.encoder(x)
+        return self.state_encoder(x)
 
-class StateDecoder(nn.Module):
+class Decoder(nn.Module):
     def __init__(self, input_size: int, output_size: int, encoding_size: int, dropout: float = 0.0) -> None:
         super().__init__()
         
-        self.decoder = nn.Sequential(
+        self.state_decoder = nn.Sequential(
             nn.Linear(input_size, encoding_size), 
             nn.Dropout(p=dropout, inplace=True),
             nn.LeakyReLU(0.2, inplace=True),
@@ -100,7 +100,7 @@ class StateDecoder(nn.Module):
         )
 
     def forward(self, x):
-        return self.decoder(x)
+        return self.state_decoder(x)
 
 class ForwardModelVAE(nn.Module): 
     def __init__(self, state_size: int, action_size: int, encoding_size: int) -> None:
@@ -167,7 +167,7 @@ class ForwardModelVAE(nn.Module):
         )
 
         # Initialize weights
-        # self.apply(common.init_weights)
+        #self.apply(common.init_weights)
         # self.encoder.apply(common.init_weights)
         # self.decoder.apply(common.init_weights)
         # self.y_encoder.apply(common.init_weights)
@@ -184,7 +184,7 @@ class ForwardModelVAE(nn.Module):
             return mu
 
     def sample_z(self, bs, method=None, h_state=None):
-        z = torch.randn(bs, self.nz)
+        z = torch.randn(bs, self.nz).type_as(h_state)
         return z
 
     def forward_single_step(self, input_states, action, z):
@@ -223,7 +223,7 @@ class ForwardModelVAE(nn.Module):
         actions = actions.view(bs, -1, self.action_size) # => [bs, num_actions, action_size]
 
         npred = actions.size(1)
-        ploss = torch.zeros(1)
+        ploss = torch.zeros(1).type_as(inputs)
 
         pred_states = []
         z_list = []

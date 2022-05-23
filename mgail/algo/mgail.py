@@ -24,22 +24,22 @@ class MGAIL(object):
         self.forward_model = ForwardModelVAE(
             state_size=self.env.state_size,
             action_size=self.env.action_size,
-            hidden_size=self.env.fm_size
-        )
+            encoding_size=self.env.fm_size
+        ).to(self.env.device)
 
         self.discriminator = Discriminator(
             in_dim=self.env.state_size + self.env.action_size, # add whole trajectory for state:  self.env.history_length*self.env.state_size
             out_dim=2,
             size=self.env.d_size,
             do_keep_prob=self.do_keep_prob
-        )
+        ).to(self.env.device)
 
         self.policy = Policy(
             in_dim=self.env.state_size, # add whole trajectory for state:  self.env.history_length*self.env.state_size
             out_dim=self.env.action_size,
             size=self.env.p_size,
             do_keep_prob=self.do_keep_prob
-        )
+        ).to(self.env.device)
 
         # Create experience buffers
         self.er_agent = ER(
@@ -62,13 +62,17 @@ class MGAIL(object):
 
     def action_test(self, states: torch.Tensor, noise: float, do_keep_prob: float) -> torch.Tensor:
         # Normalize the states
-        states = common.normalize(states, self.er_expert.states_mean, self.er_expert.states_std).float()
+        states = common.normalize(states, self.er_expert.states_mean, self.er_expert.states_std)
+        states = states.to(self.env.device)
 
         # Get actions using learned policy
-        mu = self.policy(states, do_keep_prob)
+        mu = self.policy(states[:,-1], do_keep_prob).cpu()
         if self.env.continuous_actions:
-            a = common.denormalize(mu, torch.as_tensor(self.er_expert.actions_mean), torch.as_tensor(self.er_expert.actions_std))
-            eta = torch.normal(mean=0.0, std=torch.as_tensor(self.env.sigma))
+            actions_mean = torch.as_tensor(self.er_expert.actions_mean)
+            actions_std = torch.as_tensor(self.er_expert.actions_std)
+            a = common.denormalize(mu, actions_mean, actions_std)
+
+            eta = torch.normal(mean=0.0, std=self.env.sigma)
             action_test = (a + noise * eta).squeeze()
         else:
             a = common.gumbel_softmax(logits=mu, temperature=self.temp)
@@ -78,7 +82,8 @@ class MGAIL(object):
 
     def train(self, states: torch.Tensor) -> torch.Tensor:
         # Normalize the inputs
-        states = common.normalize(states, self.er_expert.states_mean, self.er_expert.states_std).float()
+        states = common.normalize(states, self.er_expert.states_mean, self.er_expert.states_std)
+        states = states.to(self.env.device)
         
         # Cost value
         total_cost = torch.zeros((1)).type_as(states)
@@ -87,10 +92,10 @@ class MGAIL(object):
         while (not env_term_sig) and t < self.env.n_steps_train and \
                 total_trans_err < self.env.total_trans_err_allowed:
 
-            mu = self.policy(state)
+            mu = self.policy(state[:,-1])[0]
             
             if self.env.continuous_actions:
-                eta = torch.as_tensor(self.env.sigma).float() * torch.normal(mean=torch.zeros_like(mu), std=1.0)
+                eta = self.env.sigma.type_as(mu) * torch.normal(mean=torch.zeros_like(mu), std=1.0)
                 action = mu + eta
             else:
                 action = common.gumbel_softmax_sample(logits=mu, temperature=self.temp)
@@ -105,19 +110,19 @@ class MGAIL(object):
 
             # get action
             if self.env.continuous_actions:
-                a_sim = common.denormalize(action.clone().detach().numpy(), self.er_expert.actions_mean, self.er_expert.actions_std)
+                a_sim = common.denormalize(action.clone().cpu().detach(), self.er_expert.actions_mean, self.er_expert.actions_std).numpy()
             else:
-                a_sim = torch.argmax(action.clone().detach().numpy(), dimension=1)
+                a_sim = torch.argmax(action.clone().cpu().detach(), dimension=1).numpy()
 
             # get next state
             state_env, _, env_term_sig, = self.env.step(a_sim, mode='tensorflow')[:3]
             state_e = common.normalize(state_env, self.er_expert.states_mean, self.er_expert.states_std).float()
             state_e = state_e.detach() # stop gradient
             
-            z_t = self.forward_model.sample_z(state.size(0))
+            z_t = self.forward_model.sample_z(state.size(0), h_state=state)
             state_a = self.forward_model.forward_single_step(state, action, z_t).unsqueeze(0)
 
-            state, nu = common.re_parametrization(state_e=state_e, state_a=state_a)
+            state, nu = common.re_parametrization(state_e=state_e.type_as(state_a), state_a=state_a)
             total_trans_err += torch.mean(abs(nu))
             t += 1
 

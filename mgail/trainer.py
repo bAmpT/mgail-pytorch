@@ -57,13 +57,15 @@ class Trainer(object):
     def train_forward_model(self) -> None:
         alg = self.algorithm
         input_states, _, _, target_states, actions = alg.er_agent.sample()[:5]
-        input_states, actions, target_states = torch.as_tensor(input_states), torch.as_tensor(actions), torch.as_tensor(target_states)
+        input_states = torch.as_tensor(input_states).to(self.env.device)
+        actions = torch.as_tensor(actions).to(self.env.device)
+        target_states = torch.as_tensor(target_states).to(self.env.device)
         
-        input_states = common.normalize(input_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
-        actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
-        target_states = common.normalize(target_states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
+        input_states = common.normalize(input_states, alg.er_expert.states_mean.type_as(input_states), alg.er_expert.states_std.type_as(input_states))
+        actions = common.normalize(actions, alg.er_expert.actions_mean.type_as(actions), alg.er_expert.actions_std.type_as(actions))
+        target_states = common.normalize(target_states, alg.er_expert.states_mean.type_as(target_states), alg.er_expert.states_std.type_as(target_states))
         
-        [pred_states, z_list], loss_pred = alg.forward_model(input_states, actions, target_states)
+        [pred_states, z_list], loss_pred = alg.forward_model(input_states, actions, target_states, z_dropout=self.env.z_dropout)
 
         loss_state = F.mse_loss(pred_states, target_states, reduction='mean')
         forward_model_loss = loss_state + self.env.fm_beta*loss_pred
@@ -88,12 +90,12 @@ class Trainer(object):
         # labels (policy/expert) : 0/1, and in 1-hot form: policy-[1,0], expert-[0,1]
         labels_a = np.zeros(shape=(state_a_.shape[0],), dtype=np.float32)
         labels_e = np.ones(shape=(state_e_.shape[0],), dtype=np.float32)
-        label = torch.as_tensor(np.expand_dims(np.concatenate([labels_a, labels_e]), axis=1))
+        label = torch.as_tensor(np.expand_dims(np.concatenate([labels_a, labels_e]), axis=1)).to(self.env.device)
 
         labels = torch.cat([1 - label, label], 1)
 
-        states = common.normalize(states, alg.er_expert.states_mean, alg.er_expert.states_std).float()
-        actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).float()
+        states = common.normalize(states, alg.er_expert.states_mean, alg.er_expert.states_std).to(self.env.device)
+        actions = common.normalize(actions, alg.er_expert.actions_mean, alg.er_expert.actions_std).to(self.env.device)
         d = alg.discriminator(states, actions)
 
         # 2.1 0-1 accuracy
@@ -127,7 +129,7 @@ class Trainer(object):
             state = self.env.get_state()
 
         # Accumulate the (noisy) adversarial gradient
-        policy_loss = torch.zeros((1))
+        policy_loss = torch.zeros((1)).to(self.env.device)
         for i in range(self.env.policy_accum_steps):
             # accumulate AL gradient
             states = torch.as_tensor(np.array(state)).unsqueeze(0).float()
@@ -170,8 +172,8 @@ class Trainer(object):
                 do_keep_prob = 1.
 
             # use frame stacked observations
-            states = torch.as_tensor(np.reshape(observation, [1, self.env.history_length, -1])).float()
-            a = alg.action_test(states, noise=float(noise_flag), do_keep_prob=do_keep_prob).detach().cpu().numpy().astype(np.float32)
+            states = torch.as_tensor(np.reshape(observation, [1, self.env.history_length, -1]), dtype=torch.float32)
+            a = alg.action_test(states, noise=float(noise_flag), do_keep_prob=do_keep_prob).detach().numpy().astype(np.float32)
             
             observation, reward, done, info = self.env.step(a, mode='python')
 

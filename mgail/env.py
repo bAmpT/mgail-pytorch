@@ -5,8 +5,9 @@ from mgail.common import FrameStack
 
 
 class Environment(object):
-    def __init__(self, run_dir: str, env_name: str):
+    def __init__(self, run_dir: str, env_name: str, device: str):
         self.name = env_name
+        self.device = torch.device(device)
         self._train_params()
         self.gym = gym.make(self.name)
         self.gym = FrameStack(self.gym, self.history_length)
@@ -61,6 +62,7 @@ class Environment(object):
         self.n_train_iters = 1000000
         self.n_episodes_test = 1
         self.test_interval = 1000
+        self.save_interval = 10000
         self.n_steps_test = 1000
         self.vis_flag = False
         self.save_models = True
@@ -100,6 +102,7 @@ class Environment(object):
         # Hyperparameters
         self.fm_beta = 1e-6
         self.fm_grad_clip = 5.0
+        self.z_dropout = 0.5
 
 
 

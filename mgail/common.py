@@ -41,15 +41,15 @@ def set_er_stats(er: ER, history_length: int, traj_length: int) -> ER:
     er.state_actions = np.empty((er.batch_size, history_length, action_dim), dtype=np.float32)
     er.traj_states = np.empty((er.batch_size, traj_length, state_dim), dtype=np.float32)
     er.traj_actions = np.empty((er.batch_size, traj_length, action_dim), dtype=np.float32)
-    er.states_min = np.min(er.states[:er.count], axis=0)
-    er.states_max = np.max(er.states[:er.count], axis=0)
-    er.actions_min = np.min(er.actions[:er.count], axis=0)
-    er.actions_max = np.max(er.actions[:er.count], axis=0)
-    er.states_mean = np.mean(er.states[:er.count], axis=0)
-    er.actions_mean = np.mean(er.actions[:er.count], axis=0)
-    er.states_std = np.std(er.states[:er.count], axis=0)
+    er.states_min = torch.as_tensor(np.min(er.states[:er.count], axis=0).astype(np.float32))
+    er.states_max = torch.as_tensor(np.max(er.states[:er.count], axis=0).astype(np.float32))
+    er.actions_min = torch.as_tensor(np.min(er.actions[:er.count], axis=0).astype(np.float32))
+    er.actions_max = torch.as_tensor(np.max(er.actions[:er.count], axis=0).astype(np.float32))
+    er.states_mean = torch.as_tensor(np.mean(er.states[:er.count], axis=0).astype(np.float32))
+    er.actions_mean = torch.as_tensor(np.mean(er.actions[:er.count], axis=0).astype(np.float32))
+    er.states_std = torch.as_tensor(np.std(er.states[:er.count], axis=0).astype(np.float32))
     er.states_std[er.states_std == 0] = 1
-    er.actions_std = np.std(er.actions[:er.count], axis=0)
+    er.actions_std = torch.as_tensor(np.std(er.actions[:er.count], axis=0).astype(np.float32))
     return er
 
 

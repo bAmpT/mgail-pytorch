@@ -31,7 +31,7 @@ class Policy(nn.Module):
     def forward(self, state: torch.Tensor, do_keep_prob: float = None) -> torch.Tensor:
         bs = state.size(0)
 
-        x = self.model(state[:,-1].view(bs, -1))
+        x = self.model(state.view(bs, -1))
         
         do_keep_prob = self.arch_params['do_keep_prob'] if do_keep_prob == None else do_keep_prob
         x = F.dropout(x, p=1.0-do_keep_prob, training=self.training)

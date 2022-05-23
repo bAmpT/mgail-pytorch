@@ -38,7 +38,7 @@ def dispatcher(env):
             trainer.print_info_line('full')
 
             # save snapshot
-            if env.train_mode and env.save_models:
+            if env.train_mode and env.save_models and trainer.itr % env.save_interval == 0:
                 trainer.save_model(dir_name=env.config_dir)
 
         trainer.itr += 1
@@ -50,9 +50,12 @@ if __name__ == '__main__':
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--seed', type=int, default=0)
     args = p.parse_args()
-    
+    args.cuda = True
+
+    device = "cuda" if args.cuda else "cpu"
+
     # load environment
-    env = Environment(run_dir=os.path.curdir, env_name=args.env_name)
+    env = Environment(run_dir=os.path.curdir, env_name=args.env_name, device=device)
 
     # start training
     dispatcher(env=env)
