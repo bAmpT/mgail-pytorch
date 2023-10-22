@@ -1,14 +1,18 @@
-## Model-Based Generative Adversarial Imitation Learning
+## Model-Based Generative Adversarial Imitation Learning (MGAIL)
 
-Code for ICML 2017 paper "End-to-End Differentiable Adversarial Imitation Learning", by Nir Baram, Oron Anschel, Itai Caspi, Shie Mannor.
+Pytorch implementation for "End-to-End Differentiable Adversarial Imitation Learning", by Nir Baram, Oron Anschel, Itai Caspi, Shie Mannor.
 
 ## Dependencies
-* gym >= 0.8.1
-* mujoco-py >= 0.5.7
-* torch >= 1.11.0
+Install the required dependencies using the following command:
+```bash
+pip install -r requirements.txt
+```
+
+## References
+The code is based on the tensorflow implementation: https://github.com/itaicaspi/mgail
 
 ## Running
-Run the following command to train the Mujoco Hopper-v2 environment by imitating an expert trained with TRPO
+Run the following command to train the Mujoco Hopper-v2 environment by imitating an expert trained with SAC or PPO:
 
 ```python
 python main.py
